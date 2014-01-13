@@ -1,0 +1,279 @@
+:deckjs_theme: web-2.0
+:deckjs_transition: horizontal-slide
+:navigation:
+:status:
+:data-uri:
+:linkcss!:
+
+= BatchEE
+
+== JBatch
+
+* Part of JavaEE 7 but works in JSE (JSR-352)
+* *Standard* solution for Batches
+* (Highly) inspired from spring-batch and IBM solution (lead)
+
+== JBatch semantic
+
+* *JobOperator* is the handler the user see.
+* *Job* is a batch composed of *Step*, *Flow* or *Split*
+* A *Step* is either a *Batchlet* or a *Chunk*
+* A *Flow* is a sequence of *Step*
+* A *Split* is a set of *Step* to execute concurrently
+* Step can get *Decision* (*Next* on, *Stop* on, *Fail* on, *End* on)
+
+== JobOperator sample
+
+[source,java,numbered]
+-------------------
+final JobOperator jobOperator = BatchRuntime.getJobOperator();
+final long id = jobOperator.start("my-batch", myJobParameters);
+
+jobOperator.stop(id);
+
+final JobInstance instance = jobOperator.getJobInstance(id);
+List<JobExecution> exec = jobOperator.getJobExecutions(instance)
+// ...
+-------------------
+
+== Hello world!
+
+A simple task printing "Hello JBatch!"
+
+[source,java,numbered]
+-------------------
+@Named // optional, can be replaced by META-INF/batch.xml
+public class MyTask extends AbstractBatchlet {
+    public String process() throws Exception {
+        System.out.println("Hello JBatch!");
+        return "exit status is ok";
+    }
+}
+-------------------
+
+And its batch definition:
+
+[source,xml,numbered]
+-------------------
+<job id="hello" xmlns="http://xmlns.jcp.org/xml/ns/javaee" version="1.0">
+  <step id="hi">
+    <batchlet ref="myTask" />
+  </step>
+</job>
+-------------------
+
+== Hello XXX!
+
+Great but how to configure it?
+
+[source,java,numbered]
+-------------------
+public class MyTask extends AbstractBatchlet {
+    @Inject
+    @BatchProperty // default name = field name
+    private String name;
+
+    public String process() throws Exception {
+        System.out.println("Hello " + name + "!");
+        return "exit status is ok for " + name;
+    }
+}
+-------------------
+
+[source,xml,numbered]
+-------------------
+<batchlet ref="myTask">
+  <properties>
+    <property name="name" value="#{jobParameters['name']}" />
+  </properties>
+</batchlet>
+-------------------
+
+== Ok but if my batchlet lasts 1h!
+
+[source,java,numbered]
+-------------------
+public class MyTask implements Batchlet {
+    // same as before
+
+    @Override
+    public void stop() {
+        // stop the task here
+    }
+}
+-------------------
+
+== Chunking, yeah!
+
+```
++-----------+  +------------+  +--------------+  +--------------+
+|   step    |  |   reader   |  |   processor  |  |    writer    |
++-----+-----+  +------+-----+  +-------+------+  +------+-------+
+    +-+               |                |                |
+    | +-----read---->++                |                |
+    | |              ++                |                |
+    | +--------------------process--->++                |
+    | |               |               ++                |
+    | +------------->++                |                |
+    | |              ++                |                |
+    | +------------------------------>++                |
+    | |               |               ++                |
+    | +-------------------------------------write----->++
+    | |               |                |               ++
+    +-+               |                |                |
+```
+
+End when reader returns null and grouped by "chunk" ~ "commit interval", timeout or custom policy.
+
+== Some code to make it obvious 1/3
+
+[source,xml,numbered]
+-------------------
+<job id="abatch" xmlns="http://xmlns.jcp.org/xml/ns/javaee" version="1.0">
+  <step id="astep">
+    <chunk>
+      <reader ref="myReader">
+        <properties>
+          <property name="foo" value="bar" />
+        </properties>
+      </reader>
+      <processor ref="myProcessor" />
+      <writer ref="myWriter" />
+    </chunk>
+  </step>
+</job>
+-------------------
+
+== Some code to make it obvious 2/3
+
+[source,java,numbered]
+-------------------
+public interface ItemReader {
+    void open(Serializable checkpoint) throws Exception;
+    void close() throws Exception;
+    Object readItem() throws Exception;
+    Serializable checkpointInfo() throws Exception;
+}
+-------------------
+
+[source,java,numbered]
+-------------------
+public interface ItemProcessor {
+    Object processItem(Object item) throws Exception;
+}
+-------------------
+
+== Some code to make it obvious 2/3
+
+[source,java,numbered]
+-------------------
+public interface ItemWriter {
+    void open(Serializable checkpoint) throws Exception;
+    void close() throws Exception;
+    void writeItems(List<Object> items) throws Exception;
+    Serializable checkpointInfo() throws Exception;
+}
+-------------------
+
+
+== Go further with chunks!
+
+Chunking API is checkpoint aware:
+
+* reader and writer can expose their state
+* if the batch is restarted the last state is provided to continue the execution
+
+Exception management is configurable (include/exclude):
+
+* retry
+* skip
+* no rollback
+
+JTA compliant!
+
+== Partitions?
+
+* A *partition* is an instance of a step
+* A partition has a thread (number of threads for partition*s* configurable)
+* Static or dynamic (*ParitionMapper*)
+* Observable through *PartitionReducer*
+* State aware (*PartitionCollector*)
+* *PartitionAnalyzer* is a kind of aggregator of collector states
+
+== Further with flow?
+
+* Flow can be static (next attribute) or dynamic using *Decider*
+
+[source,java,numbered]
+-------------------
+public interface Decider {
+    String decide(StepExecution[] executions) throws Exception;
+}
+-------------------
+
+== Listeners
+
+* Spys everywhere and configurable
+** job
+** steps
+** chunk
+** reader/processor/writer
+** retry/skip (read/process/write)
+
+== Communicating between steps
+
+[source,java,numbered]
+-------------------
+public class MyTask extends AbstractBatchlet { // any component
+    @Inject
+    private StepContext step;
+
+    @Inject
+    private JobContext job;
+
+    public String process() throws Exception {
+        final String state = step.getStepName() + "#" + job.getJobName();
+        job.setTransientUserData(state); // step.setPersistentUserData
+        return "" + job.getTransientUserData();
+    }
+}
+-------------------
+
+
+== Next!
+
+[quote]
+____
+I need an implementation!
+____
+
+
+== BatchEE
+
+* Apache project providing a JBatch implementation and basic tooling
+** Fork from IBM RI
+** Basic components (JDBC, StaX, JPA, BeanIO, ModelMapper, JSefa, Camel...)
+** GUI
+*** Web (servlet)
+*** JAX-RS (client/server)
+** Test tools (run a single step, make executino synchronous)
+** Maven plugin
+** CLI (supporting BARs!)
+** In memory/JDBC/JPA persistence
+** Security (Shiro supported)
+** JSE, CDI, JavaEE, Spring support
+
+== BatchEE.next?
+
+* Propose a fluent API instead of relying on XML
+* Propose components to projects instead of BatchEE
+* Integration in TomEE
+* More on http://batchee.incubator.apache.org
+** http://batchee.incubator.apache.org/extensions.html
+** http://batchee.incubator.apache.org/gui.html
+** http://batchee.incubator.apache.org/maven.html
+** http://batchee.incubator.apache.org/configuration.html
+
+== Thanks
+
+Test it and send your feedback to JCP and BatchEE! Little demo?
