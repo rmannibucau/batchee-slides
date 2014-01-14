@@ -79,7 +79,7 @@
           <templateEngine />
 
           <attributes>
-            <imagesdir>img</imagesdir>
+            <imagesdir>${slides.input}/resources/images</imagesdir>
 
             <description>Description</description>
             <keywords>asciidoctor, slides</keywords>

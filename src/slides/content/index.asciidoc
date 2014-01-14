@@ -255,13 +255,119 @@ ____
 ** Basic components (JDBC, StaX, JPA, BeanIO, ModelMapper, JSefa, Camel...)
 ** GUI
 *** Web (servlet)
-*** JAX-RS (client/server)
+*** JAX-RS (client/server, JSON)
 ** Test tools (run a single step, make executino synchronous)
 ** Maven plugin
 ** CLI (supporting BARs!)
 ** In memory/JDBC/JPA persistence
 ** Security (Shiro supported)
 ** JSE, CDI, JavaEE, Spring support
+
+== Testing
+
+[source,java,numbered]
+-------------------
+final JobExecution execution = JobLauncher.start("sleep", new Properties() {{
+    setProperty("duration", "500");
+}});
+
+// or
+final JobLauncher launcher = new JobLauncher("sleep");
+final JobExecution execution = launcher.start(new Properties() {{
+    setProperty("duration", "10");
+}});
+
+assertEquals(BatchStatus.COMPLETED, execution.getBatchStatus());
+final List<StepExecution> executions = launcher.getLastStepExecutions();
+assertEquals(1, executions.size());
+assertEquals("OK", executions.iterator().next().getExitStatus());
+-------------------
+
+== Open BAR, BatchEE way to package a batch!
+
+```
+├── batch
+│   ├── classes
+│   │   └── mypackage
+│   │       └── MyBatchlet.class
+│   └── jobs
+│       └── META-INF
+│           └── batch-jobs
+│               └── mybatch.xml
+├── libs
+│   ├── domain-1.6.9.jar
+│   └── core-2.6.9.jar
+└── META-INF
+    ├── MANIFEST.MF
+    └── maven
+        └── my-project
+            └── my-project
+                ├── pom.properties
+                └── pom.xml
+```
+
+== Use it with BatchEE CLI...
+
+[source,verbatim,numbered]
+-------------------
+$ java -jar batchee-cli.jar start -archive demo-1.0.bar -name mybatch
+
+ ____        _       _     ______ ______
+|  _ \      | |     | |   |  ____|  ____|
+| |_) | __ _| |_ ___| |__ | |__  | |__
+|  _ < / _` | __/ __| '_ \|  __| |  __|
+| |_) | (_| | || (__| | | | |____| |____
+|____/ \__,_|\__\___|_| |_|______|______|0.1-incubating-SNAPSHOT
+Admin mode deactivated, use -socket to activate it
+Batch 'mybatch' started with id #0
+>>> Batch in progress...
+
+=========================
+Batch status: COMPLETED
+Exit status:  COMPLETED
+Duration:     0s
+=========================
+
+-------------------
+
+== ... or Maven
+
+* Can be local (Maven JVM) or Remote (JAX-RS)
+
+-------------------
+$ mvn batchee:start -Dbatchee.job=mybatch
+...
+[INFO] --- batchee-maven-plugin:0.1-incubating-SNAPSHOT:start (default-cli) @ simple-batch ---
+[INFO] Started job mybatch, id is #0
+...
+
+$ mvn batchee:diagram -Dbatchee.path=src\main\resources\META-INF\batch-jobs\mybatch.xml
+-------------------
+
+== Diagram Mojo
+
+image::diagram.png[]
+
+* Can be started in interactive mode!
+
+== Admin GUI (Servlet) 1/4
+
+* Just a jar to embed or wrap in a war then http://ip:port/webapp/jbatch
+
+image::newjob.png[]
+image::startjob.png[]
+
+== Admin GUI (Servlet) 2/4
+
+image::home.png[]
+
+== Admin GUI (Servlet) 3/4
+
+image::statusjob.png[]
+
+== Admin GUI (Servlet) 4/4
+
+image::stepstatus.png.png[]
 
 == BatchEE.next?
 
