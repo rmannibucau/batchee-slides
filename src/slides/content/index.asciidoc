@@ -5,7 +5,7 @@
 :data-uri:
 :linkcss!:
 
-= BatchEE
+= JBatch/BatchEE
 
 == JBatch
 
