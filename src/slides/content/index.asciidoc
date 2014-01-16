@@ -286,24 +286,18 @@ assertEquals("OK", executions.iterator().next().getExitStatus());
 == Open BAR, BatchEE way to package a batch!
 
 ```
-├── batch
-│   ├── classes
-│   │   └── mypackage
-│   │       └── MyBatchlet.class
-│   └── jobs
-│       └── META-INF
-│           └── batch-jobs
-│               └── mybatch.xml
-├── libs
-│   ├── domain-1.6.9.jar
-│   └── core-2.6.9.jar
-└── META-INF
-    ├── MANIFEST.MF
-    └── maven
-        └── my-project
-            └── my-project
-                ├── pom.properties
-                └── pom.xml
+└── BATCH-INF
+    ├── batch-jobs
+    │   └── demo.xml
+    ├── batch.xml
+    ├── classes
+    │   ├── org
+    │   │   └── apache
+    │   │       └── demo
+    │   │           └── Task.class
+    │   └── someconfig.properties
+    └── lib
+        └── commons-lang3-3.1.jar
 ```
 
 == Use it with BatchEE CLI...
